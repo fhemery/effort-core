@@ -59,7 +59,12 @@ namespace EffortNetCore
             var contextDef = contextExplorer.ReadContext();
 
             var parser = new ExcelDatabaseParser<T>(_pathToFolder, _context, contextDef);
-            parser.ParseAll();
+            var reconcileSteps = parser.ParseAll();
+            foreach (var step in reconcileSteps)
+            {
+                var prop = step.TargetObject.GetType().GetProperty(step.TargetProperty);
+                prop.SetValue(step.TargetObject, _context.Find(step.PrincipalClrType, step.PrincipalId));
+            }
         }
 
         public T GetContext()

@@ -63,10 +63,17 @@ namespace EffortNetCore.Tests
         }
 
         [TestMethod]
-        public void EffortContext_ShouldParseCorrectlyOptionals()
+        public void EffortContext_ShouldParseCorrectlyOptionalBooleans()
         {
-            Assert.IsTrue(simpleObjectsFromContext.First().OptionalBool.GetValueOrDefault());
-            Assert.IsFalse(simpleObjectsFromContext.Last().OptionalBool.GetValueOrDefault());
+            Assert.IsTrue(simpleObjectsFromContext.First().OptionalBoolProperty.GetValueOrDefault());
+            Assert.IsFalse(simpleObjectsFromContext.Last().OptionalBoolProperty.GetValueOrDefault());
+        }
+
+        [TestMethod]
+        public void EffortContext_ShouldParseCorrectlyOptionalInts()
+        {
+            Assert.AreEqual(45, simpleObjectsFromContext.First().OptionalIntProperty.GetValueOrDefault());
+            Assert.AreEqual(32, simpleObjectsFromContext.Last().OptionalIntProperty.GetValueOrDefault());
         }
     }
 }

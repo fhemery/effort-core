@@ -12,6 +12,7 @@ namespace EffortNetCore.Tests.context
         public bool BoolProperty { get; set; }
         public SimpleEnum EnumProperty { get; set; }
         public Guid GuidProperty { get; set; }
-        public bool? OptionalBool { get; set; }
+        public bool? OptionalBoolProperty { get; set; }
+        public int? OptionalIntProperty { get; set; }
     }
 }

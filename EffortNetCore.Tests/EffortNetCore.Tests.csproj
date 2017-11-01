@@ -27,6 +27,21 @@
     <Content Update="data\emptydb\Empty.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Update="data\relationships\Office.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="data\relationships\Employees.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="data\relationships\CompanyStatistics.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="data\relationships\CompanyDetails.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="data\relationships\Companies.xlsx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Update="data\singleObject_WithTableAnnotation\AnotherTable.xlsx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

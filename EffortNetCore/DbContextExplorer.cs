@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EffortNetCore
 {
@@ -45,10 +46,40 @@ namespace EffortNetCore
                     tableName = newEntity.DbSetName;
                 }
 
+                newEntity.FieldMapping = HandleFieldMapping(entity);
+
                 contextDef.AllTables.Add(tableName, newEntity);
             });
 
             return contextDef;
+        }
+
+        private Dictionary<string, EntityFieldDefinition> HandleFieldMapping(IEntityType entity)
+        {
+            var mapping = new Dictionary<string, EntityFieldDefinition>();
+            var foreignKeys = entity.GetForeignKeys().ToList();
+            foreach (var property in entity.ClrType.GetProperties())
+            {
+                var foreignKey = foreignKeys.Where(fk => fk.DeclaringEntityType == entity
+                    && fk.Properties[0].IsShadowProperty
+                    && fk.DependentToPrincipal.Name == property.Name).FirstOrDefault();
+                if (foreignKey != null)
+                {
+                    mapping.Add(foreignKey.Properties[0].Name,
+                        new EntityFieldDefinition
+                        {
+                            Name = property.Name,
+                            PrincipalEntityClrType = foreignKey.PrincipalEntityType.ClrType,
+                            IsDependantAndShadowKey = true
+                        });
+                }
+                else
+                {
+                    mapping.Add(property.Name, new EntityFieldDefinition { Name = property.Name });
+                }
+            }
+
+            return mapping;
         }
     }
 
@@ -66,7 +97,14 @@ namespace EffortNetCore
     {
         public string EntityName { get; set; }
         public Type EntityClrType { get; set; }
-        public Dictionary<string, string> FieldMapping { get; set; }
+        public Dictionary<string, EntityFieldDefinition> FieldMapping { get; set; }
         public string DbSetName { get; set; }
+    }
+
+    public class EntityFieldDefinition
+    {
+        public string Name { get; set; }
+        public bool IsDependantAndShadowKey { get; set; }
+        public Type PrincipalEntityClrType { get; set; }
     }
 }

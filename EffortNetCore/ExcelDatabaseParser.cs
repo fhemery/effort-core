@@ -24,8 +24,9 @@ namespace EffortNetCore
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         }
 
-        public void ParseAll()
+        public List<ReconcileStep> ParseAll()
         {
+            var steps = new List<ReconcileStep>();
             foreach (var filePath in Directory.GetFiles(_pathToFolder, "*.xlsx"))
             {
                 var tableName = Path.GetFileNameWithoutExtension(filePath);
@@ -36,20 +37,21 @@ namespace EffortNetCore
 
                 var entityDetails = _contextDef.AllTables[tableName];
 
-                if (entityDetails.DbSetName == null)
+                object dbSetToAddTo = null;
+                if (entityDetails.DbSetName != null)
                 {
-                    throw new NotImplementedException("Not yet managing entities not having their dbsets. Come back later !");
+                    Type contextType = typeof(T);
+                    dbSetToAddTo = contextType.GetProperty(entityDetails.DbSetName).GetValue(_context);
                 }
-
-                Type contextType = typeof(T);
-                var dbSetToAddTo = contextType.GetProperty(entityDetails.DbSetName).GetValue(_context);
-
-                ReadFile(filePath, dbSetToAddTo, entityDetails.EntityClrType);
+                var fileSteps = ReadFile(filePath, dbSetToAddTo, entityDetails);
+                steps.AddRange(fileSteps);
             }
+            return steps;
         }
 
-        private void ReadFile(string filePath, object dbSetToAddTo, Type entityType)
+        private List<ReconcileStep> ReadFile(string filePath, object dbSetToAddTo, EntityDefinition entityDetails)
         {
+            var steps = new List<ReconcileStep>();
             using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
             {
                 using (var reader = ExcelReaderFactory.CreateReader(stream, new ExcelReaderConfiguration()
@@ -62,25 +64,56 @@ namespace EffortNetCore
                     while (reader.Read())
                     {
                         ++currentLine;
+                        var entityType = entityDetails.EntityClrType;
                         var newObject = Activator.CreateInstance(entityType);
-
+                        var mapping = entityDetails.FieldMapping;
                         for (var col = 0; col < headers.Length; ++col)
                         {
-                            var targetProperty = entityType.GetProperty(headers[col]);
-
-                            try
+                            if (!mapping.ContainsKey(headers[col]))
                             {
-                                FillPropertyFromParsedField(reader, newObject, col, targetProperty);
+                                throw new EffortException($"Field not found in entity mapping for entity {entityDetails.EntityName}: {headers[col]}");
                             }
-                            catch (Exception e)
+                            var mappedField = mapping[headers[col]];
+
+                            if (mappedField.IsDependantAndShadowKey)
                             {
-                                throw new EffortException($"Error occured when trying to convert line {currentLine}, column {col + 1}: " + e.Message);
+                                var newStep = new ReconcileStep
+                                {
+                                    TargetObject = newObject,
+                                    TargetProperty = mappedField.Name,
+                                    PrincipalClrType = mappedField.PrincipalEntityClrType
+                                };
+                                FillPropertyFromParsedField(reader, newStep, col, newStep.GetType().GetProperty("PrincipalId"));
+                                steps.Add(newStep);
+                            }
+                            else
+                            {
+                                var targetProperty = entityType.GetProperty(mappedField.Name);
+
+                                try
+                                {
+                                    FillPropertyFromParsedField(reader, newObject, col, targetProperty);
+                                }
+                                catch (Exception e)
+                                {
+                                    throw new EffortException($"Error occured when trying to convert line {currentLine}, column {col + 1} of file {filePath}: " + e.Message + "\n" + e.StackTrace);
+                                }
                             }
                         }
-                        dbSetToAddTo.GetType().GetMethod("Add").Invoke(dbSetToAddTo, new[] { newObject });
+                        if (dbSetToAddTo != null)
+                        {
+                            dbSetToAddTo.GetType().GetMethod("Add").Invoke(dbSetToAddTo, new[] { newObject });
+                        }
+                        else
+                        {
+                            var addMethod = _context.GetType().GetMethods().Where(m => m.Name == "Add" && m.IsGenericMethod == false).FirstOrDefault();
+                            addMethod.Invoke(_context, new[] { newObject });
+                        }
                     }
                 }
             }
+
+            return steps;
         }
 
         private void FillPropertyFromParsedField(IExcelDataReader reader, object newObject, int col, PropertyInfo targetProperty)
@@ -112,11 +145,11 @@ namespace EffortNetCore
 
         private void ParseInt(int value, object newObject, PropertyInfo targetProperty)
         {
-            if (targetProperty.PropertyType == typeof(int))
+            if (targetProperty.PropertyType == typeof(int) || targetProperty.PropertyType == typeof(int?))
             {
                 targetProperty.SetValue(newObject, value);
             }
-            else if (targetProperty.PropertyType == typeof(bool))
+            else if (targetProperty.PropertyType == typeof(bool) || targetProperty.PropertyType == typeof(bool?))
             {
                 targetProperty.SetValue(newObject, Convert.ToBoolean(targetProperty));
             }
@@ -132,7 +165,7 @@ namespace EffortNetCore
 
         private void ParseDouble(double value, object newObject, PropertyInfo targetProperty)
         {
-            if (targetProperty.PropertyType == typeof(int))
+            if (targetProperty.PropertyType == typeof(int) || targetProperty.PropertyType == typeof(int?))
             {
                 targetProperty.SetValue(newObject, Convert.ToInt32(value));
             }
@@ -140,7 +173,7 @@ namespace EffortNetCore
             {
                 targetProperty.SetValue(newObject, value);
             }
-            else if (targetProperty.PropertyType == typeof(bool))
+            else if (targetProperty.PropertyType == typeof(bool) || targetProperty.PropertyType == typeof(bool?))
             {
                 targetProperty.SetValue(newObject, Convert.ToBoolean(value));
             }
